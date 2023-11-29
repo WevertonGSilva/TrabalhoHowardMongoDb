@@ -47,16 +47,39 @@ Para executar o sistema basta executar o script Python a seguir:
             # Realiza a conexão com o Mongo
             mongo.connect()
 
-            # Solicita ao usuario o novo CPF
-            cpf = input("CPF (Novo): ")
-            # Solicita ao usuario o novo nome
-            nome = input("Nome (Novo): ")
-            # Insere e persiste o novo paciente
-            mongo.db["pacientes"].insert_one({"cpf": cpf, "nome": nome})
-            # Recupera os dados do novo paciente criado transformando em um DataFrame
-            df_paciente = pd.DataFrame(list(mongo.db["pacientes"].find({"cpf":f"{cpf}"}, {"cpf": 1, "nome": 1, "_id": 0})))
-            # Exibe os dados do paciente em formato DataFrame
-            print(df_paciente)
+        # Cria uma nova conexão com o banco
+        self.mongo.connect()
+        
+        #Solicita ao usuario a nova descrição do produto
+        descricao_novo_produto = input("Descrição (Novo): ")
+        proximo_produto = self.mongo.db["produtos"].aggregate([
+                                                    {
+                                                        '$group': {
+                                                            '_id': '$produtos', 
+                                                            'proximo_produto': {
+                                                                '$max': '$codigo_produto'
+                                                            }
+                                                        }
+                                                    }, {
+                                                        '$project': {
+                                                            'proximo_produto': {
+                                                                '$sum': [
+                                                                    '$proximo_produto', 1
+                                                                ]
+                                                            }, 
+                                                            '_id': 0
+                                                        }
+                                                    }
+                                                ])
+
+        proximo_produto = int(list(proximo_produto)[0]['proximo_produto'])
+        
+        # Insere e Recupera o código do novo produto
+        id_produto = self.mongo.db["produtos"].insert_one({"codigo_produto": proximo_produto, "descricao_produto": descricao_novo_produto})
+        # Recupera os dados do novo produto criado transformando em um DataFrame
+        df_produto = self.recupera_produto(id_produto.inserted_id)
+        # Cria um novo objeto Produto
+        novo_produto = Produto(df_produto.codigo_produto.values[0], df_produto.descricao_produto.values[0])
 
             # Fecha a conexão com o Mong
             mongo.close()
